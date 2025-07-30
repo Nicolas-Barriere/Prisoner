@@ -1,55 +1,95 @@
-'use client'
-import axios from "axios";
-import { useState } from "react";
+'use client';
+
+import { useState } from 'react';
+import axios from 'axios';
 
 type Round = {
-  p1: string;
-  p2: string;
+  p1: 'C' | 'D';
+  p2: 'C' | 'D';
   s1: number;
   s2: number;
 };
 
-type GameResult = {
-  players: [string, string];
-  rounds: Round[];
-  score: { [key: string]: number };
-};
-
 export default function Home() {
-  const [result, setResult] = useState<GameResult | null>(null);
+  const [rounds, setRounds] = useState<Round[]>([]);
+  const [players] = useState(['GPT', 'Mistral']);
   const [loading, setLoading] = useState(false);
+  const [scores, setScores] = useState({ GPT: 0, Mistral: 0 });
 
-  const play = async () => {
+  const playMatch = async () => {
     setLoading(true);
-    const res = await axios.post("http://localhost:8000/api/play/");
-    setResult(res.data);
+    setRounds([]);
+    setScores({ GPT: 0, Mistral: 0 });
+    const game = await axios.post('http://localhost:8000/api/new_game/');
+    const game_id = game.data.game_id;
+
+    let currentScores = { GPT: 0, Mistral: 0 };
+    for (let i = 0; i < 10; i++) {
+      const res = await axios.post('http://localhost:8000/api/next_round/', { game_id });
+      const roundData = res.data;
+      console.log(roundData);
+      setRounds((prev) => [...prev, {
+        p1: roundData.p1,
+        p2: roundData.p2,
+        s1: roundData.scores.GPT - scores.GPT,
+        s2: roundData.scores.Mistral - scores.Mistral,
+      }]);
+
+      currentScores = {
+        GPT: roundData.scores.GPT,
+        Mistral: roundData.scores.Mistral,
+      };
+      setScores(currentScores);
+
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      if (roundData.finished) break;
+    }
     setLoading(false);
   };
 
   return (
-    <main style={{ padding: 32, fontFamily: "sans-serif" }}>
-      <h1>Dilemme du Prisonnier — IA vs IA</h1>
-      <button onClick={play} disabled={loading}>
-        {loading ? "Simulation..." : "Lancer un match"}
+    <main className="p-6 font-mono">
+      <h1 className="text-3xl font-bold mb-4">Dilemme du Prisonnier - Match IA</h1>
+
+      <button
+        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        onClick={playMatch}
+        disabled={loading}
+      >
+        {loading ? 'Match en cours...' : 'Lancer le match'}
       </button>
 
-      {result && (
-        <>
-          <h2>Résultat final</h2>
-          <p>
-            {result.players[0]}: {result.score[result.players[0]]} pts |
-            {result.players[1]}: {result.score[result.players[1]]} pts
-          </p>
+      <div className="mt-6">
+        <h2 className="text-xl font-semibold mb-2">Scores</h2>
+        <p>GPT: {scores.GPT}</p>
+        <p>Mistral: {scores.Mistral}</p>
+      </div>
 
-          <ul>
-            {result.rounds.map((r, i) => (
-              <li key={i}>
-                Tour {i + 1}: {r.p1} vs {r.p2} → {r.s1}-{r.s2}
-              </li>
+      <div className="mt-6">
+        <h2 className="text-xl font-semibold mb-2">Rounds</h2>
+        <table className="w-full text-left border">
+          <thead>
+            <tr>
+              <th className="border px-2">#</th>
+              <th className="border px-2">GPT</th>
+              <th className="border px-2">Mistral</th>
+              <th className="border px-2">+GPT</th>
+              <th className="border px-2">+Mistral</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rounds.map((r, i) => (
+              <tr key={i}>
+                <td className="border px-2">{i + 1}</td>
+                <td className="border px-2">{r.p1}</td>
+                <td className="border px-2">{r.p2}</td>
+                <td className="border px-2">{r.s1}</td>
+                <td className="border px-2">{r.s2}</td>
+              </tr>
             ))}
-          </ul>
-        </>
-      )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }

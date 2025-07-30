@@ -1,42 +1,33 @@
-from .strategies.always_cooperate import AlwaysCooperate
-from .strategies.tit_for_tat import TitForTat
+class PrisonerGame:
+    def __init__(self, players=["GPT", "Mistral"], max_rounds=50):
+        self.players = players
+        self.max_rounds = max_rounds
+        self.round = 0
+        self.history = []  # liste de dicts avec p1, p2, s1, s2
+        self.scores = {p: 0 for p in players}
 
-SCORES = {
-    ("C", "C"): (3, 3),
-    ("C", "D"): (0, 5),
-    ("D", "C"): (5, 0),
-    ("D", "D"): (1, 1)
-}
+    def is_finished(self):
+        return self.round >= self.max_rounds
 
-class Player:
-    def __init__(self, strategy):
-        self.strategy = strategy
-        self.history = []
-        self.score = 0
+    def add_round(self, p1_move, p2_move):
+        s1, s2 = get_score(p1_move, p2_move)
+        print(s1, s2)
+        self.history.append({
+            "p1": p1_move,
+            "p2": p2_move,
+            "s1": s1,
+            "s2": s2
+        })
+        self.scores[self.players[0]] += s1
+        self.scores[self.players[1]] += s2
+        self.round += 1
 
-    def play(self, opponent_history):
-        action = self.strategy.decide(self.history, opponent_history)
-        self.history.append(action)
-        return action
-
-def run_match(rounds=50):
-    p1 = Player(AlwaysCooperate("GPT"))
-    p2 = Player(TitForTat("Claude"))
-
-    round_results = []
-    for _ in range(rounds):
-        a1 = p1.play(p2.history)
-        a2 = p2.play(p1.history)
-        s1, s2 = SCORES[(a1, a2)]
-        p1.score += s1
-        p2.score += s2
-        round_results.append({"p1": a1, "p2": a2, "s1": s1, "s2": s2})
-
-    return {
-        "players": [p1.strategy.name, p2.strategy.name],
-        "rounds": round_results,
-        "score": {
-            p1.strategy.name: p1.score,
-            p2.strategy.name: p2.score,
-        }
-    }
+def get_score(p1, p2):
+    if p1 == "C" and p2 == "C":
+        return 3, 3
+    elif p1 == "C" and p2 == "D":
+        return 0, 5
+    elif p1 == "D" and p2 == "C":
+        return 5, 0
+    else:
+        return 1, 1
